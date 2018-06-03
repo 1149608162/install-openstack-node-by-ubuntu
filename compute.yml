@@ -1,0 +1,68 @@
+---
+- hosts: kvm-compute-2
+ tasks:
+ - name: sudo root
+   shell: sudo -i
+ - name: install chrony #安装chrony服务
+   apt: name=chrony state=latest
+ - name: write the chrony config file #写入配置文件
+   template: src=/home/stack/chrony.conf dest=/etc/chrony.conf
+ - name: start chrony #启动chrony服务
+   service: name=chronyd state=started
+ - name: hostname jiexi #进行地址解析
+   copy: 
+     src: /home/stack/etc/hosts
+	 dest: /etc/hosts
+	 owner: root
+	 group: root
+	 mode: u=rw,g=r,o=r
+ - name: add owner hosts
+   shell: echo "192.168.1.102 kvm-compute-2" >> /etc/hosts
+ - name: Ensure a locale exists
+   locale_gen:
+     name: en_US.UTF-8
+	 state: present
+ - name: set timezone to asia/Shanghai
+   timezone:
+     name: Asia/Shanghai
+ - name: install openstack-queen search
+   apt:
+	 name: software-properties-common
+	 state: latest
+ - name: add queens
+   command: add-apt-repository cloud-archive:queens
+ - name: install nova-compute
+   apt: name=nova-compute state=latest
+ - name: write the compute config file
+   copy:
+     src: /home/stack/nova/nova.conf 
+	 dest: /etc/nova/nova.conf
+	 owner: root
+	 group: nova
+	 mode: u=rw,g=r,o=r
+ - name: change nova config file
+   shell: sed -e 's/my_ip = 192.168.1.101/my_ip = 192.168.1.102/g' /etc/nova/nova.conf
+ - name: start nova-compute
+   service: name=nova-compute state=restarted
+ - name: install neutron in compute
+   apt: name=neutron-openvswitch-agent state=latest
+ - name: copy neutron config file
+   copy:
+     src: /home/stack/neutron/neutron.conf
+	 dest: /etc/neutron/neutron.conf
+	 owner: root
+	 group: neutron
+	 mode: u=rw,g=r,o=r
+ - name: change openvswitch.ini config file
+   copy: 
+     src: /home/stack/neutron/plugins/ml2/openvswitch_agent.ini
+	 dest: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+	 owner: root
+	 group: neutron
+	 mode: u=rw,g=r,o=r
+ - name: change openvswitch_agent.ini config file
+   shell: sed -e 's/192.168.1.101/192.168.1.102/g' /etc/neutron/plugins/ml2/openvswitch_agent.ini
+ - name: restart neutron-openvswitch-agent
+   service: name=neutron-openvswitch-agent state=restarted
+ - name: restart compute nova server
+   service: name=nova-compute state=restarted
